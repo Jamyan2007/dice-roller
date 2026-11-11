@@ -1,0 +1,223 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Dice Roller</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one centered column. Controls on top, last roll in the middle, bar chart below. */
+:root {
+  --page: #f9f9f7;
+  --card: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink2: #52514e;
+  --line: #c3c2b7;
+  --bar: #2a78d6;
+  --hot: #eb6834;
+  --btn-text: #ffffff;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --line: #383835;
+    --bar: #3987e5; --hot: #d95926;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --line: #383835;
+  --bar: #3987e5; --hot: #d95926;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 16px/1.5 var(--font);
+  padding-block: 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-size: 24px; margin: 0; }
+.lede { margin: 4px 0 0; color: var(--ink2); }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 14px; font-weight: 600; color: var(--ink2); }
+select {
+  font: inherit; color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+}
+button {
+  font: inherit; font-weight: 600; cursor: pointer;
+  border-radius: 6px; padding: 9px 16px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+}
+button.main { background: var(--bar); border-color: var(--bar); color: var(--btn-text); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--bar); outline-offset: 2px; }
+
+.dice { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.die {
+  width: 52px; height: 52px; display: grid; place-items: center;
+  font-size: 26px; font-weight: 700;
+  border: 2px solid var(--ink); border-radius: 10px; background: var(--card);
+}
+.result { margin: 0; font-size: 18px; }
+
+.chart-title { margin: 0 0 4px; font-size: 18px; }
+.sub { margin: 0 0 12px; color: var(--ink2); font-size: 14px; }
+.bars, .labels { display: flex; gap: 3px; }
+.bars { height: 180px; align-items: flex-end; border-bottom: 1px solid var(--line); }
+.col { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+.bar { width: 100%; background: var(--bar); border-radius: 4px 4px 0 0; }
+.bar.last { background: var(--hot); }
+.labels { margin-top: 4px; }
+.labels span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: var(--ink2); }
+.key { margin: 12px 0 0; font-size: 14px; color: var(--ink2); }
+.swatch { display: inline-block; width: 10px; height: 10px; background: var(--hot); border-radius: 2px; margin-right: 4px; }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Dice Roller</h1>
+    <p class="lede">Pick how many dice, press Roll, and watch the bars grow.</p>
+  </div>
+
+  <div class="card controls">
+    <div class="field">
+      <label for="count">How many dice?</label>
+      <select id="count">
+        <option value="1">1 die</option>
+        <option value="2" selected>2 dice</option>
+        <option value="3">3 dice</option>
+        <option value="4">4 dice</option>
+      </select>
+    </div>
+    <button class="main" id="roll">Roll</button>
+    <button id="roll100">Roll 100 times</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="card">
+    <div class="dice" id="dice"></div>
+    <p class="result" id="result" aria-live="polite"></p>
+  </div>
+
+  <div class="card">
+    <h2 class="chart-title">Totals rolled</h2>
+    <p class="sub" id="sub"></p>
+    <div class="bars" id="bars"></div>
+    <div class="labels" id="labels"></div>
+    <p class="key"><span class="swatch"></span>Orange bar: your last roll</p>
+  </div>
+</div>
+
+<script>
+var countSelect = document.getElementById('count');
+var diceBox = document.getElementById('dice');
+var resultBox = document.getElementById('result');
+var subBox = document.getElementById('sub');
+var barsBox = document.getElementById('bars');
+var labelsBox = document.getElementById('labels');
+
+var totals = {};   // how many times each total came up
+var rolls = 0;     // how many times we rolled
+var lastFaces = [];
+
+// Roll the dice one time and remember the result.
+function rollOnce() {
+  var n = Number(countSelect.value);
+  var faces = [];
+  var sum = 0;
+  for (var i = 0; i < n; i++) {
+    var face = Math.floor(Math.random() * 6) + 1;
+    faces.push(face);
+    sum = sum + face;
+  }
+  totals[sum] = (totals[sum] || 0) + 1;
+  rolls = rolls + 1;
+  lastFaces = faces;
+}
+
+function sumOf(list) {
+  var s = 0;
+  for (var i = 0; i < list.length; i++) s = s + list[i];
+  return s;
+}
+
+// Draw the dice, the sentence, and the bars.
+function draw() {
+  var n = Number(countSelect.value);
+  var lastSum = sumOf(lastFaces);
+
+  var diceHtml = '';
+  for (var i = 0; i < lastFaces.length; i++) {
+    diceHtml = diceHtml + '<div class="die">' + lastFaces[i] + '</div>';
+  }
+  diceBox.innerHTML = diceHtml;
+  if (lastFaces.length === 0) {
+    resultBox.textContent = 'Press Roll to start.';
+  } else if (n === 1) {
+    resultBox.textContent = 'You rolled ' + lastSum;
+  } else {
+    resultBox.textContent = 'You rolled ' + lastFaces.join(' + ') + ' = ' + lastSum;
+  }
+
+  // Find the biggest count so the tallest bar fills the chart.
+  var biggest = 0;
+  var common = 0;
+  for (var t = n; t <= 6 * n; t++) {
+    var c = totals[t] || 0;
+    if (c > biggest) { biggest = c; common = t; }
+  }
+
+  var barsHtml = '';
+  var labelsHtml = '';
+  for (var total = n; total <= 6 * n; total++) {
+    var count = totals[total] || 0;
+    var height = biggest ? Math.round((count / biggest) * 100) : 0;
+    var cls = total === lastSum ? 'bar last' : 'bar';
+    barsHtml = barsHtml + '<div class="col" title="Total ' + total + ': ' + count + ' times"><div class="' + cls + '" style="height:' + height + '%"></div></div>';
+    labelsHtml = labelsHtml + '<span>' + total + '</span>';
+  }
+  barsBox.innerHTML = barsHtml;
+  labelsBox.innerHTML = labelsHtml;
+
+  if (rolls === 0) {
+    subBox.textContent = 'No rolls yet.';
+  } else {
+    subBox.textContent = 'Rolled ' + rolls + (rolls === 1 ? ' time' : ' times') + '. Most common total: ' + common + ' (' + biggest + ' times). Hover a bar to see its count.';
+  }
+}
+
+function reset() {
+  totals = {};
+  rolls = 0;
+  lastFaces = [];
+}
+
+document.getElementById('roll').onclick = function () {
+  rollOnce();
+  draw();
+};
+document.getElementById('roll100').onclick = function () {
+  for (var i = 0; i < 100; i++) rollOnce();
+  draw();
+};
+document.getElementById('reset').onclick = function () {
+  reset();
+  draw();
+};
+countSelect.onchange = function () {
+  reset();
+  for (var i = 0; i < 50; i++) rollOnce();
+  draw();
+};
+
+// Start with 50 example rolls so the chart is not empty.
+for (var i = 0; i < 50; i++) rollOnce();
+draw();
+</script>
+
+</body></html>
