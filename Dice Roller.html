@@ -74,6 +74,15 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--bar); outl
 .bar.last { background: var(--hot); }
 .labels { margin-top: 4px; }
 .labels span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: var(--ink2); }
+.chartbox { position: relative; }
+.tip {
+  position: absolute; z-index: 2; pointer-events: none; white-space: nowrap;
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 8px; font-size: 14px; font-weight: 600;
+}
+.tip[hidden] { display: none; }
+.col:hover .bar { opacity: 0.8; }
 .key { margin: 12px 0 0; font-size: 14px; color: var(--ink2); }
 .swatch { display: inline-block; width: 10px; height: 10px; background: var(--hot); border-radius: 2px; margin-right: 4px; }
 </style>
@@ -107,8 +116,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--bar); outl
   <div class="card">
     <h2 class="chart-title">Totals rolled</h2>
     <p class="sub" id="sub"></p>
-    <div class="bars" id="bars"></div>
-    <div class="labels" id="labels"></div>
+    <div class="chartbox" id="chartbox">
+      <div class="bars" id="bars"></div>
+      <div class="labels" id="labels"></div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
     <p class="key"><span class="swatch"></span>Orange bar: your last roll</p>
   </div>
 </div>
@@ -178,7 +190,7 @@ function draw() {
     var count = totals[total] || 0;
     var height = biggest ? Math.round((count / biggest) * 100) : 0;
     var cls = total === lastSum ? 'bar last' : 'bar';
-    barsHtml = barsHtml + '<div class="col" title="Total ' + total + ': ' + count + ' times"><div class="' + cls + '" style="height:' + height + '%"></div></div>';
+    barsHtml = barsHtml + '<div class="col" data-total="' + total + '" data-count="' + count + '"><div class="' + cls + '" style="height:' + height + '%"></div></div>';
     labelsHtml = labelsHtml + '<span>' + total + '</span>';
   }
   barsBox.innerHTML = barsHtml;
@@ -214,6 +226,38 @@ countSelect.onchange = function () {
   for (var i = 0; i < 50; i++) rollOnce();
   draw();
 };
+
+// Hover box: show the total and its count when the pointer is over a bar column.
+var chartBox = document.getElementById('chartbox');
+var tip = document.getElementById('tip');
+
+function showTip(e) {
+  var col = e.target.closest('.col');
+  if (!col) {
+    tip.hidden = true;
+    return;
+  }
+  var times = col.dataset.count;
+  tip.textContent = 'Total ' + col.dataset.total + ': ' + times + (times === '1' ? ' time' : ' times');
+  tip.hidden = false;
+
+  var box = chartBox.getBoundingClientRect();
+  var bar = col.firstChild.getBoundingClientRect();
+  var left = bar.left - box.left + bar.width / 2 - tip.offsetWidth / 2;
+  left = Math.max(0, Math.min(left, box.width - tip.offsetWidth));
+  var top = bar.top - box.top - tip.offsetHeight - 6;
+  if (top < 0) top = 0;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+
+function hideTip() {
+  tip.hidden = true;
+}
+
+barsBox.addEventListener('pointermove', showTip);
+barsBox.addEventListener('pointerdown', showTip);
+barsBox.addEventListener('pointerleave', hideTip);
 
 // Start with 50 example rolls so the chart is not empty.
 for (var i = 0; i < 50; i++) rollOnce();
